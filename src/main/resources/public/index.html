@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MultiCrawler - Advanced Web Crawler</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-spider"></i> MultiCrawler</h1>
+
+    <div class="config-panel">
+        <h2>Crawler Configuration</h2>
+        <div class="form-group">
+            <label for="seed">Seed URL</label>
+            <input id="seed" type="text" placeholder="https://example.com"/>
+        </div>
+        <div class="form-group">
+            <label for="depth">Max Depth</label>
+            <input id="depth" type="number" value="2" min="0" max="5"/>
+        </div>
+        <div class="form-group">
+            <label for="threads">Threads</label>
+            <input id="threads" type="number" value="4" min="1" max="20"/>
+        </div>
+        <div class="form-group">
+            <label for="delay">Delay (ms)</label>
+            <input id="delay" type="number" value="0" min="0"/>
+        </div>
+        <div class="form-group">
+            <label for="userAgent">User Agent</label>
+            <input id="userAgent" type="text" value="MultiCrawlerBot/1.0"/>
+        </div>
+        <div class="form-group">
+            <label for="filter">URL Filter</label>
+            <input id="filter" type="text" placeholder="regex pattern (optional)"/>
+        </div>
+        <div class="form-group">
+            <label for="timeout">Timeout (ms)</label>
+            <input id="timeout" type="number" value="10000" min="1000"/>
+        </div>
+
+        <div class="button-group">
+            <button id="start"><i class="fas fa-play"></i> Start</button>
+            <button id="stop" disabled><i class="fas fa-stop"></i> Stop</button>
+            <button id="reset" class="secondary"><i class="fas fa-redo"></i> Reset</button>
+            <button id="clearDb" class="danger"><i class="fas fa-trash"></i> Clear DB</button>
+        </div>
+    </div>
+
+    <div class="status-container">
+        <div class="status-box">
+            <h2>Status</h2>
+            <pre id="status">Idle</pre>
+        </div>
+        <div class="progress-container">
+            <h2>Progress</h2>
+            <div id="progress-bar">
+                <div id="progress-value"></div>
+            </div>
+            <div class="stats-cards">
+                <div class="stats-card">
+                    <h3>Success</h3>
+                    <p id="success-count">0</p>
+                </div>
+                <div class="stats-card">
+                    <h3>Errors</h3>
+                    <p id="error-count">0</p>
+                </div>
+                <div class="stats-card">
+                    <h3>Total Size</h3>
+                    <p id="total-size">0 KB</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="results">Results Table</div>
+        <div class="tab" data-tab="visualization">Network Visualization</div>
+        <div class="tab" data-tab="stats">Statistics</div>
+        <div class="tab" data-tab="settings">Settings</div>
+    </div>
+
+    <div id="results" class="tab-content active">
+        <div class="table-controls">
+            <div class="search-box">
+                <input type="text" id="search" placeholder="Search URLs...">
+                <select id="status-filter">
+                    <option value="all">All Status Codes</option>
+                    <option value="200">200 OK</option>
+                    <option value="3xx">3xx Redirects</option>
+                    <option value="4xx">4xx Client Errors</option>
+                    <option value="5xx">5xx Server Errors</option>
+                </select>
+            </div>
+            <div class="export-buttons">
+                <button id="load-db" class="secondary">
+                    <i class="fas fa-database"></i> Load DB
+                </button>
+                <button id="export-csv" class="secondary"><i class="fas fa-file-csv"></i> CSV</button>
+                <button id="export-json" class="secondary"><i class="fas fa-file-code"></i> JSON</button>
+                <button id="export-excel" class="secondary"><i class="fas fa-file-excel"></i> Excel</button>
+            </div>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th data-sort="index">#</th>
+                <th data-sort="url">URL</th>
+                <th data-sort="statusCode">Status</th>
+                <th data-sort="contentSize">Size</th>
+                <th data-sort="contentType">Content Type</th>
+                <th data-sort="timestamp">Time</th>
+            </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+        </table>
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <div id="visualization" class="tab-content">
+        <h2>Network Graph</h2>
+        <p>Visual representation of crawled pages and their relationships.</p>
+        <div class="visualizer" id="network-graph"></div>
+    </div>
+
+    <div id="stats" class="tab-content">
+        <h2>Crawl Statistics</h2>
+        <div class="stats-cards">
+            <div class="stats-card">
+                <h3>Total Pages</h3>
+                <p id="stats-total">0</p>
+            </div>
+            <div class="stats-card">
+                <h3>Average Size</h3>
+                <p id="stats-avg-size">0 KB</p>
+            </div>
+            <div class="stats-card">
+                <h3>Success Rate</h3>
+                <p id="stats-success-rate">0%</p>
+            </div>
+            <div class="stats-card">
+                <h3>Crawl Time</h3>
+                <p id="stats-time">0s</p>
+            </div>
+        </div>
+
+        <h3>Status Code Distribution</h3>
+        <div class="visualizer" id="status-chart"></div>
+
+        <h3>Content Type Distribution</h3>
+        <div class="visualizer" id="content-chart"></div>
+    </div>
+
+    <div id="settings" class="tab-content">
+        <h2>Application Settings</h2>
+        <div class="form-group">
+            <label for="results-per-page">Results per page</label>
+            <input id="results-per-page" type="number" value="10" min="5" max="100">
+        </div>
+        <div class="form-group">
+            <label for="auto-refresh">Auto-refresh (sec)</label>
+            <input id="auto-refresh" type="number" value="1" min="0" max="10">
+        </div>
+        <div class="button-group">
+            <button id="save-settings"><i class="fas fa-save"></i> Save Settings</button>
+        </div>
+    </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
