@@ -74,6 +74,10 @@
                     <h3>Total Size</h3>
                     <p id="total-size">0 KB</p>
                 </div>
+                <div class="stats-card">
+                    <h3>Revisits</h3>
+                    <p id="revisit-count">0</p>
+                </div>
             </div>
         </div>
     </div>
@@ -92,6 +96,7 @@
                 <select id="status-filter">
                     <option value="all">All Status Codes</option>
                     <option value="200">200 OK</option>
+                    <option value="304">304 Not Modified (Revisits)</option>
                     <option value="3xx">3xx Redirects</option>
                     <option value="4xx">4xx Client Errors</option>
                     <option value="5xx">5xx Server Errors</option>
@@ -115,6 +120,7 @@
                 <th data-sort="contentSize">Size</th>
                 <th data-sort="contentType">Content Type</th>
                 <th data-sort="timestamp">Time</th>
+                <th data-sort="title">Title</th>
             </tr>
             </thead>
             <tbody id="results-body"></tbody>
@@ -166,11 +172,18 @@
             <label for="auto-refresh">Auto-refresh (sec)</label>
             <input id="auto-refresh" type="number" value="1" min="0" max="10">
         </div>
+        <div class="form-group">
+            <label for="highlight-revisits">Highlight Revisits</label>
+            <input id="highlight-revisits" type="checkbox" checked>
+        </div>
         <div class="button-group">
             <button id="save-settings"><i class="fas fa-save"></i> Save Settings</button>
         </div>
     </div>
 </div>
+
+<div id="notification-container"></div>
+
 <script src="script.js"></script>
 </body>
 </html>

@@ -8,12 +8,12 @@ import org.jsoup.select.Elements;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 public class CrawlTask implements Runnable {
-    private static final Set<String> VISITED = ConcurrentHashMap.newKeySet();
+    private static final Map<String, VisitInfo> VISITED_INFO = new ConcurrentHashMap<>();
     private final String url;
     private final int depth;
     private final int maxDepth;
@@ -24,6 +24,16 @@ public class CrawlTask implements Runnable {
     private final int delay;
     private final String userAgent;
     private final int timeout;
+
+    static class VisitInfo {
+        int count;
+        long lastVisitTimestamp;
+
+        VisitInfo(int count, long timestamp) {
+            this.count = count;
+            this.lastVisitTimestamp = timestamp;
+        }
+    }
 
     public CrawlTask(
             String url,
@@ -66,7 +76,31 @@ public class CrawlTask implements Runnable {
             }
         }
 
-        if (!VISITED.add(url)) {
+        long currentTime = Instant.now().toEpochMilli();
+        VisitInfo visitInfo = VISITED_INFO.compute(url, (k, v) -> {
+            if (v == null) {
+                return new VisitInfo(1, currentTime);
+            } else {
+                v.count++;
+                v.lastVisitTimestamp = currentTime;
+                return v;
+            }
+        });
+
+        boolean isRevisit = visitInfo.count > 1;
+
+        if (isRevisit && service.isActiveSession()) {
+            CrawlResult revisitResult = new CrawlResult(
+                    url,
+                    304, // appropriate status for revisits
+                    0,
+                    referrer,
+                    "text/html",
+                    "REVISIT: Previously crawled " + formatTimeDifference(currentTime - visitInfo.lastVisitTimestamp) + " ago",
+                    0,
+                    currentTime
+            );
+            service.addResult(revisitResult);
             service.taskCompleted();
             return;
         }
@@ -90,6 +124,10 @@ public class CrawlTask implements Runnable {
             if (contentType != null && contentType.startsWith("text/html")) {
                 Document doc = resp.parse();
                 title = doc.title();
+
+                if (isRevisit) {
+                    title = "[REVISITED] " + title;
+                }
 
                 if (depth < maxDepth) {
                     Elements links = doc.select("a[href]");
@@ -133,7 +171,7 @@ public class CrawlTask implements Runnable {
                     0,
                     referrer,
                     null,
-                    null,
+                    isRevisit ? "[REVISITED] Error processing URL" : "Error processing URL",
                     0,
                     Instant.now().toEpochMilli()
             );
@@ -159,4 +197,19 @@ public class CrawlTask implements Runnable {
         }
     }
 
+    private String formatTimeDifference(long timeDiff) {
+        long seconds = timeDiff / 1000;
+        if (seconds < 60) {
+            return seconds + " seconds";
+        } else if (seconds < 3600) {
+            return (seconds / 60) + " minutes";
+        } else {
+            return (seconds / 3600) + " hours";
+        }
+    }
+
+    public static void resetVisitedInfo() {
+        VISITED_INFO.clear();
+    }
 }
+

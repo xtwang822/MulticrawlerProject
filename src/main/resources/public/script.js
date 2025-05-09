@@ -24,10 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const results = await fetch('/api/db-results').then(r => r.json());
             crawlResults = results.map((r, i) => ({...r, index: i + 1}));
             handleSearch();           // re‑apply filters / sorting / render
-            alert(`Loaded ${crawlResults.length} rows from database`);
+            showToast(`Loaded ${crawlResults.length} rows from database`);
         } catch (err) {
             console.error('DB load error', err);
-            alert('Failed to load data from DB');
+            showToast('Failed to load data from DB', 'error');
         }
     });
 
@@ -41,9 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPolling = false;
     let pollInterval = null;
     let crawlStartTime = null;
+    let isPaused = false;
 
     initializeTabs();
     loadSettings();
+    createNotificationContainer();
 
     // Add event listeners
     startBtn.addEventListener('click', startCrawl);
@@ -60,6 +62,40 @@ document.addEventListener('DOMContentLoaded', () => {
     exportJsonBtn.addEventListener('click', () => exportData('json'));
     exportExcelBtn.addEventListener('click', () => exportData('excel'));
 
+    function createNotificationContainer() {
+        const container = document.createElement('div');
+        container.id = 'notification-container';
+        container.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        `;
+        document.body.appendChild(container);
+    }
+
+    function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        toast.style.cssText = `
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            color: white;
+            background-color: ${type === 'error' ? '#e74c3c' : '#3498db'};
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease, fadeOut 0.5s 2.5s ease forwards;
+            max-width: 300px;
+        `;
+
+        document.getElementById('notification-container').appendChild(toast);
+
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+
     function initializeTabs() {
         const tabs = document.querySelectorAll('.tab');
         const tabContents = document.querySelectorAll('.tab-content');
@@ -71,6 +107,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 tab.classList.add('active');
                 document.getElementById(tab.dataset.tab).classList.add('active');
+
+                if (tab.dataset.tab === 'visualization' || tab.dataset.tab === 'stats') {
+                    updateVisualizations();
+                }
             });
         });
     }
@@ -97,7 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
             autoRefresh: parseInt(document.getElementById('auto-refresh').value)
         };
 
-        // Only add theme setting if the element exists
         const themeEl = document.getElementById('theme');
         if (themeEl) {
             settings.theme = themeEl.value;
@@ -109,28 +148,34 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePagination();
         renderResults();
 
-        alert('Settings saved successfully!');
+        showToast('Settings saved successfully!');
     }
 
     async function startCrawl() {
         const seedUrl = document.getElementById('seed').value;
         if (!seedUrl) {
-            alert('Please enter a seed URL');
+            showToast('Please enter a seed URL', 'error');
             return;
         }
 
         try {
-            crawlResults = [];
-            filteredResults = [];
-            updateResultsStats();
-            renderResults();
-
             startBtn.disabled = true;
             stopBtn.disabled = false;
+            stopBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
 
-            crawlStartTime = Date.now();
+            if (!isPaused) {
+                crawlResults = [];
+                filteredResults = [];
+                updateResultsStats();
+                renderResults();
+                crawlStartTime = Date.now();
+            } else {
+                startBtn.innerHTML = '<i class="fas fa-play"></i> Start';
+            }
 
-            await fetch('/api/start', {
+
+
+            const response = await fetch('/api/start', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -144,37 +189,73 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
 
+            if (!isPaused) {
+                crawlStartTime = Date.now();
+            }
+
             isPolling = true;
+            const wasResuming = isPaused;
+            isPaused = false;
+
+            clearInterval(pollInterval);
             const autoRefreshSeconds = parseInt(document.getElementById('auto-refresh').value);
             if (autoRefreshSeconds > 0) {
                 pollInterval = setInterval(pollStatus, autoRefreshSeconds * 1000);
-                pollStatus();
+            }
+
+            await pollStatus();
+
+            if (wasResuming) {
+                showToast('Crawl restarted');
+            } else {
+                showToast('Crawl started');
             }
         } catch (error) {
             console.error('Error starting crawl:', error);
-            alert('Failed to start crawl: ' + error.message);
+            showToast('Failed to start crawl: ' + error.message, 'error');
             startBtn.disabled = false;
         }
     }
-
 
     async function stopCrawl() {
         try {
-            await fetch('/api/stop', {method: 'POST'});
-            stopBtn.disabled = true;
-            startBtn.disabled = false;
-            clearInterval(pollInterval);
-            isPolling = false;
-            pollStatus();
+            if (isPaused) {
+                await fetch('/api/terminate', {method: 'POST'});
+                stopBtn.disabled = true;
+                startBtn.disabled = false;
+                stopBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+                isPaused = false;
+                clearInterval(pollInterval);
+                isPolling = false;
+                showToast('Crawl terminated');
+            } else {
+                await fetch('/api/stop', {method: 'POST'});
+                stopBtn.innerHTML = '<i class="fas fa-times"></i> Terminate';
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-play"></i> Restart';
+                isPaused = true;
+                clearInterval(pollInterval);
+                isPolling = false;
+                showToast('Crawl paused');
+
+                setTimeout(() => {
+                    pollStatus();
+                }, 100);
+            }
         } catch (error) {
             console.error('Error stopping crawl:', error);
-            alert('Failed to stop crawl: ' + error.message);
+            showToast('Failed to stop crawl: ' + error.message, 'error');
         }
     }
 
+
+
     function resetApp() {
+        fetch('/api/terminate', {method: 'POST'}).catch(err => console.error('Error terminating crawl:', err));
+
         if (isPolling) {
-            stopCrawl();
+            clearInterval(pollInterval);
+            isPolling = false;
         }
 
         crawlResults = [];
@@ -182,7 +263,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentPage = 1;
         sortField = 'index';
         sortDirection = 'asc';
+        isPaused = false;
 
+        // Reset
         document.getElementById('seed').value = '';
         document.getElementById('depth').value = 2;
         document.getElementById('threads').value = 4;
@@ -193,10 +276,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         statusEl.textContent = 'Idle';
         progressBar.style.width = '0%';
+
+        startBtn.disabled = false;
+        startBtn.innerHTML = '<i class="fas fa-play"></i> Start';
+        stopBtn.disabled = true;
+        stopBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+
         updateResultsStats();
         renderResults();
         resetVisualizations();
     }
+
+
 
     async function clearDatabase() {
         if (confirm('Are you sure you want to clear all crawl results from the database?')) {
@@ -211,9 +302,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function formatTime(ms) {
+        const seconds = ms / 1000;
+        if (seconds < 60) {
+            return `${seconds.toFixed(1)}s`;
+        } else if (seconds < 3600) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}m ${remainingSeconds}s`;
+        } else {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}h ${minutes}m`;
+        }
+    }
+
     async function pollStatus() {
         try {
-            const status = await fetch('/api/status').then(r => r.json());
+            const statusResponse = await fetch('/api/status');
+            const status = await statusResponse.json();
+
             statusEl.textContent = JSON.stringify(status, null, 2);
 
             if (status.totalTasks > 0) {
@@ -221,28 +329,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 progressBar.style.width = `${progress}%`;
             }
 
-            const results = await fetch('/api/results').then(r => r.json());
+            if (status.duration) {
+                document.getElementById('stats-time').textContent = formatTime(status.duration);
+            }
+
+            const resultsResponse = await fetch('/api/results');
+            const results = await resultsResponse.json();
             crawlResults = results.map((r, i) => ({...r, index: i + 1}));
 
             updateResultsStats();
-
             handleSearch();
-
             updateVisualizations();
 
-            if (!status.running && isPolling) {
+            if (status.paused) {
+                startBtn.disabled = false;
+                stopBtn.disabled = false;
+                stopBtn.innerHTML = '<i class="fas fa-times"></i> Terminate';
+                return;
+            }
+
+            if (!status.running && !status.paused && isPolling) {
                 clearInterval(pollInterval);
                 isPolling = false;
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
 
-                const crawlTime = (Date.now() - crawlStartTime) / 1000;
-                document.getElementById('stats-time').textContent = `${crawlTime.toFixed(1)}s`;
+                if (status.duration) {
+                    document.getElementById('stats-time').textContent = formatTime(status.duration);
+                }
+
+                showToast('Crawl complete!');
             }
         } catch (error) {
             console.error('Error polling status:', error);
         }
     }
+
+
+
 
     function handleSearch() {
         const searchTerm = searchInput.value.toLowerCase();
@@ -368,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsBody.innerHTML = '';
 
         if (pageResults.length === 0) {
-            resultsBody.innerHTML = `<tr><td colspan="6" style="text-align:center">No results found</td></tr>`;
+            resultsBody.innerHTML = `<tr><td colspan="7" style="text-align:center">No results found</td></tr>`;
             return;
         }
 
@@ -386,30 +510,35 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (result.statusCode >= 400) statusClass = 'text-danger';
 
             row.innerHTML = `
-                <td>${result.index}</td>
-                <td class="url-cell">
-                    <div class="tooltip">
-                        <a href="${result.url}" target="_blank" rel="noopener noreferrer">${truncateUrl(result.url, 50)}</a>
-                        <span class="tooltiptext">${result.url}</span>
-                    </div>
-                </td>
-                <td class="${statusClass}">${result.statusCode || 'N/A'}</td>
-                <td>${formattedSize}</td>
-                <td>${result.contentType || 'Unknown'}</td>
-                <td>${formattedTime}</td>
-            `;
+            <td>${result.index}</td>
+            <td class="url-cell">
+                <div class="tooltip">
+                    <a href="${result.url}" target="_blank" rel="noopener noreferrer">${truncateUrl(result.url, 50)}</a>
+                    <span class="tooltiptext">${result.url}</span>
+                </div>
+            </td>
+            <td class="${statusClass}">${result.statusCode || 'N/A'}</td>
+            <td>${formattedSize}</td>
+            <td>${result.contentType || 'Unknown'}</td>
+            <td>${formattedTime}</td>
+            <td>${result.title || ''}</td>
+        `;
             resultsBody.appendChild(row);
         });
     }
+
 
     function updateResultsStats() {
         let successCount = 0;
         let errorCount = 0;
         let totalSize = 0;
+        let revisitCount = 0;
 
         crawlResults.forEach(result => {
             if (result.statusCode >= 200 && result.statusCode < 300) {
                 successCount++;
+            } else if (result.statusCode === 304) {
+                revisitCount++;
             } else {
                 errorCount++;
             }
@@ -420,12 +549,20 @@ document.addEventListener('DOMContentLoaded', () => {
         errorCountEl.textContent = errorCount;
         totalSizeEl.textContent = formatBytes(totalSize);
 
+        // Update revisit count if element exists
+        const revisitCountEl = document.getElementById('revisit-count');
+        if (revisitCountEl) {
+            revisitCountEl.textContent = revisitCount;
+        }
+
         document.getElementById('stats-total').textContent = crawlResults.length;
         document.getElementById('stats-avg-size').textContent =
             crawlResults.length ? formatBytes(totalSize / crawlResults.length) : '0 B';
         document.getElementById('stats-success-rate').textContent =
             crawlResults.length ? `${Math.round((successCount / crawlResults.length) * 100)}%` : '0%';
+
     }
+
 
     function updateVisualizations() {
         if (crawlResults.length === 0) return;

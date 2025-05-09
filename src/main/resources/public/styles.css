@@ -58,16 +58,22 @@ button {
     padding: 10px 15px;
     border-radius: 4px;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: background 0.3s, transform 0.2s;
 }
 
 button:hover {
     background: #2980b9;
+    transform: translateY(-2px);
+}
+
+button:active {
+    transform: translateY(1px);
 }
 
 button:disabled {
     background: #95a5a6;
     cursor: not-allowed;
+    transform: none;
 }
 
 button.danger {
@@ -136,6 +142,11 @@ button.secondary:hover {
     border-bottom: none;
     border-radius: 4px 4px 0 0;
     margin-right: 5px;
+    transition: all 0.3s;
+}
+
+.tab:hover {
+    background-color: #f5f5f5;
 }
 
 .tab.active {
@@ -156,6 +167,12 @@ button.secondary:hover {
 
 .tab-content.active {
     display: block;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .table-controls {
@@ -168,6 +185,7 @@ button.secondary:hover {
 .search-box {
     display: flex;
     align-items: center;
+    gap: 10px;
 }
 
 .export-buttons {
@@ -225,6 +243,28 @@ tr:hover {
     background: #f1f1f1;
 }
 
+/* Revisited rows */
+.revisited-row {
+    background-color: rgba(52, 152, 219, 0.1) !important;
+    position: relative;
+}
+
+.revisited-badge {
+    background-color: #3498db;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: 5px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.revisited-title {
+    color: #3498db !important;
+    font-style: italic;
+}
+
 .pagination {
     display: flex;
     justify-content: center;
@@ -266,6 +306,11 @@ tr:hover {
     padding: 1rem;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     text-align: center;
+    transition: transform 0.3s;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
 }
 
 .stats-card h3 {
@@ -282,7 +327,7 @@ tr:hover {
     color: #2c3e50;
 }
 
-/* Tooltip styles */
+/* Tooltip */
 .tooltip {
     position: relative;
     display: inline-block;
@@ -290,19 +335,20 @@ tr:hover {
 
 .tooltip .tooltiptext {
     visibility: hidden;
-    width: 200px;
-    background-color: #555;
+    width: 250px;
+    background-color: #333;
     color: #fff;
     text-align: center;
     border-radius: 6px;
-    padding: 5px;
+    padding: 8px;
     position: absolute;
     z-index: 1;
     bottom: 125%;
     left: 50%;
-    margin-left: -100px;
+    margin-left: -125px;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.3s, visibility 0.3s;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
 }
 
 .tooltip:hover .tooltiptext {
@@ -310,6 +356,79 @@ tr:hover {
     opacity: 1;
 }
 
+.tooltip .tooltiptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+.title-tooltip .tooltiptext {
+    width: 300px;
+    margin-left: -150px;
+}
+
+/* Toast Notifications */
+#notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.toast {
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    color: white;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    animation: slideIn 0.3s ease, fadeOut 0.5s 2.5s ease forwards;
+    max-width: 300px;
+}
+
+.toast-info {
+    background-color: #3498db;
+}
+
+.toast-error {
+    background-color: #e74c3c;
+}
+
+.toast-success {
+    background-color: #2ecc71;
+}
+
+.text-success {
+    color: #28a745;
+}
+
+.text-warning {
+    color: #ffc107;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+
+.text-info {
+    color: #17a2b8;
+}
+
+/* Responsive styles */
 @media (max-width: 768px) {
     .status-container {
         flex-direction: column;

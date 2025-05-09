@@ -37,7 +37,13 @@ public class Main {
         post("/api/stop", (req, res) -> {
             crawlerService.stop();
             res.status(200);
-            return "{\"status\":\"stopped\"}";
+            return "{\"status\":\"paused\"}";
+        });
+
+        post("/api/terminate", (req, res) -> {
+            crawlerService.terminateCrawl();
+            res.status(200);
+            return "{\"status\":\"terminated\"}";
         });
 
         get("/api/status", (req, res) -> {
@@ -109,3 +115,4 @@ public class Main {
         return 4567;
     }
 }
+

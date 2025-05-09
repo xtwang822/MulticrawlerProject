@@ -3,17 +3,26 @@ package com.example.crawler;
 // Represents the current status of a crawl operation
 public record Status(
         boolean running,
+        boolean paused,
         int totalTasks,
         int completedTasks,
         long duration
 ) {
+    public Status(boolean running, int totalTasks, int completedTasks, long duration) {
+        this(running, false, totalTasks, completedTasks, duration);
+    }
+
     public int getProgressPercentage() {
         if (totalTasks == 0) return 0;
         return (int) ((completedTasks * 100.0) / totalTasks);
     }
 
     public boolean isComplete() {
-        return !running && completedTasks >= totalTasks;
+        return !running && !paused && completedTasks >= totalTasks;
+    }
+
+    public boolean isPaused() {
+        return paused;
     }
 
     public String getFormattedDuration() {
